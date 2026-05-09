@@ -1,0 +1,723 @@
+import { useState, useEffect } from "react";
+
+// ── THEME ─────────────────────────────────────────────────────────────────
+const C = {
+  bg: "#f7f5f0",
+  white: "#ffffff",
+  card: "#ffffff",
+  border: "#e8e4dc",
+  primary: "#1a6b3c",       // Algerian green
+  primaryLight: "#e8f4ed",
+  primaryDark: "#0f4525",
+  accent: "#e8a020",        // gold accent
+  accentLight: "#fdf3e0",
+  red: "#c0392b",
+  text: "#1a1a2e",
+  muted: "#7a7a8a",
+  subtle: "#f0ede8",
+  grad: "linear-gradient(135deg, #1a6b3c, #2ecc71)",
+  gradGold: "linear-gradient(135deg, #e8a020, #f4c842)",
+};
+
+// ── DATA ──────────────────────────────────────────────────────────────────
+const WILAYAS = ["الجزائر العاصمة","وهران","قسنطينة","عنابة","بجاية","تلمسان","سطيف","باتنة","بسكرة","ورقلة","تيزي وزو","المدية","البليدة","بومرداس","تيبازة","جيجل","سكيكدة","غليزان","مستغانم","سيدي بلعباس"];
+const SUBJECTS = ["الرياضيات","الفيزياء","الكيمياء","العربية","الفرنسية","الإنجليزية","التاريخ والجغرافيا","العلوم الطبيعية","الفلسفة","الإعلام الآلي","التربية الإسلامية"];
+const LEVELS = ["الابتدائي (1-5)","المتوسط (1-4)","الثانوي (1-3)","جامعي / BAC+"];
+
+const TEACHERS = [
+  { id:1, name:"أستاذ كريم بن سالم", subject:"الرياضيات", level:"الثانوي + BAC", wilaya:"الجزائر العاصمة", price:1500, rating:4.9, reviews:127, avatar:"ك", online:true, exp:8, badge:"مميّز" },
+  { id:2, name:"أستاذة أمينة حداد", subject:"الفيزياء", level:"الثانوي (1-3)", wilaya:"وهران", price:1200, rating:4.8, reviews:89, avatar:"أ", online:true, exp:6, badge:"جديد" },
+  { id:3, name:"أستاذ يوسف مزياني", subject:"الرياضيات + الفيزياء", level:"المتوسط", wilaya:"قسنطينة", price:1000, rating:4.7, reviews:64, avatar:"ي", online:false, exp:4, badge:null },
+  { id:4, name:"أستاذة سارة بوعلام", subject:"اللغة الفرنسية", level:"الكل", wilaya:"الجزائر العاصمة", price:1300, rating:4.9, reviews:203, avatar:"س", online:true, exp:10, badge:"مميّز" },
+  { id:5, name:"أستاذ رضا تواتي", subject:"العلوم الطبيعية", level:"الثانوي", wilaya:"بجاية", price:900, rating:4.6, reviews:41, avatar:"ر", online:false, exp:3, badge:null },
+  { id:6, name:"أستاذة إيمان كرار", subject:"اللغة العربية", level:"الابتدائي + المتوسط", wilaya:"سطيف", price:800, rating:4.8, reviews:156, avatar:"إ", online:true, exp:7, badge:"مميّز" },
+];
+
+const STATS = [
+  { n:"4,200+", label:"أستاذ مسجّل", icon:"👨‍🏫" },
+  { n:"28,000+", label:"طالب نشط", icon:"🎓" },
+  { n:"48", label:"ولاية مغطّاة", icon:"🗺️" },
+  { n:"98%", label:"رضا الطلاب", icon:"⭐" },
+];
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+const Avatar = ({ letter, size=42, color=C.primary }) => (
+  <div style={{
+    width:size, height:size, borderRadius:"50%",
+    background:`linear-gradient(135deg, ${color}, ${color}99)`,
+    display:"flex", alignItems:"center", justifyContent:"center",
+    color:"#fff", fontWeight:800, fontSize:size*0.38, flexShrink:0,
+    boxShadow:`0 2px 12px ${color}44`,
+  }}>{letter}</div>
+);
+
+const Tag = ({ children, color=C.primary, bg=C.primaryLight }) => (
+  <span style={{ fontSize:11, color, background:bg, padding:"3px 10px", borderRadius:20, fontWeight:700, whiteSpace:"nowrap" }}>{children}</span>
+);
+
+const Btn = ({ children, onClick, variant="primary", small=false, style:sx={} }) => {
+  const base = {
+    padding: small ? "8px 16px" : "13px 28px",
+    borderRadius:10, border:"none", cursor:"pointer",
+    fontSize: small ? 12 : 14, fontWeight:700, fontFamily:"inherit",
+    transition:"all 0.18s", ...sx,
+  };
+  const styles = {
+    primary:   { background:C.grad, color:"#fff", boxShadow:`0 4px 20px ${C.primary}44` },
+    outline:   { background:"transparent", color:C.primary, border:`2px solid ${C.primary}` },
+    gold:      { background:C.gradGold, color:"#fff", boxShadow:`0 4px 20px ${C.accent}44` },
+    ghost:     { background:C.subtle, color:C.text, border:"none" },
+  };
+  return (
+    <button style={{ ...base, ...styles[variant] }} onClick={onClick}
+      onMouseEnter={e => { e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.opacity="0.92"; }}
+      onMouseLeave={e => { e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.opacity="1"; }}
+    >{children}</button>
+  );
+};
+
+// ── COMPONENTS ─────────────────────────────────────────────────────────────
+
+function Navbar({ page, setPage, user, setUser }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  return (
+    <nav style={{
+      position:"sticky", top:0, zIndex:50, background:"rgba(255,255,255,0.95)",
+      backdropFilter:"blur(12px)", borderBottom:`1px solid ${C.border}`,
+      padding:"0 32px", display:"flex", alignItems:"center",
+      justifyContent:"space-between", height:64, direction:"rtl",
+    }}>
+      {/* Logo */}
+      <div style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} onClick={()=>setPage("home")}>
+        <div style={{
+          width:38, height:38, background:C.grad, borderRadius:10,
+          display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize:20, boxShadow:`0 4px 14px ${C.primary}44`,
+        }}>📚</div>
+        <div>
+          <div style={{ fontSize:18, fontWeight:900, color:C.primary, letterSpacing:"-0.02em", lineHeight:1 }}>دَرْسنا</div>
+          <div style={{ fontSize:9, color:C.muted, letterSpacing:"0.12em" }}>DARSNA.DZ</div>
+        </div>
+      </div>
+
+      {/* Nav links */}
+      <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+        {[["home","الرئيسية"],["search","البحث عن أستاذ"],["how","كيف تعمل"],].map(([p,l])=>(
+          <button key={p} onClick={()=>setPage(p)} style={{
+            padding:"8px 16px", borderRadius:8, border:"none",
+            background: page===p ? C.primaryLight : "transparent",
+            color: page===p ? C.primary : C.muted,
+            fontSize:13, fontWeight: page===p ? 700 : 400,
+            cursor:"pointer", fontFamily:"inherit", transition:"all 0.15s",
+          }}>{l}</button>
+        ))}
+      </div>
+
+      {/* Auth */}
+      <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+        {user ? (
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <Avatar letter={user.name[0]} size={34} />
+            <span style={{ fontSize:13, fontWeight:700, color:C.text }}>{user.name}</span>
+            <Btn small variant="ghost" onClick={()=>{ setUser(null); setPage("home"); }}>خروج</Btn>
+          </div>
+        ) : (
+          <>
+            <Btn small variant="outline" onClick={()=>setPage("login")}>تسجيل الدخول</Btn>
+            <Btn small onClick={()=>setPage("register")}>إنشاء حساب</Btn>
+          </>
+        )}
+      </div>
+    </nav>
+  );
+}
+
+function HeroSection({ setPage }) {
+  const [query, setQuery] = useState("");
+  const [wilaya, setWilaya] = useState("");
+
+  return (
+    <section style={{
+      background:`linear-gradient(160deg, #0f4525 0%, #1a6b3c 50%, #2ecc71 100%)`,
+      padding:"80px 32px 100px", textAlign:"center", direction:"rtl", position:"relative", overflow:"hidden",
+    }}>
+      {/* Decorative circles */}
+      {[[300,"-80px","right"],[200,"60%","left"],[150,"30%","bottom"]].map(([s,t,p],i)=>(
+        <div key={i} style={{
+          position:"absolute", width:s, height:s, borderRadius:"50%",
+          border:"1px solid rgba(255,255,255,0.08)", top:t, [p]:"-60px", pointerEvents:"none",
+        }}/>
+      ))}
+
+      {/* Badge */}
+      <div style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(255,255,255,0.12)", backdropFilter:"blur(8px)", borderRadius:30, padding:"6px 16px", marginBottom:28 }}>
+        <span style={{ fontSize:14 }}>🇩🇿</span>
+        <span style={{ fontSize:12, color:"rgba(255,255,255,0.9)", letterSpacing:"0.08em", fontWeight:600 }}>المنصة التعليمية الأولى في الجزائر</span>
+      </div>
+
+      <h1 style={{ fontSize:"clamp(32px,5vw,58px)", fontWeight:900, color:"#fff", margin:"0 auto 16px", maxWidth:700, lineHeight:1.15, letterSpacing:"-0.02em" }}>
+        أستاذك الخصوصي<br />
+        <span style={{ color:C.accent }}>على بُعد نقرة واحدة</span>
+      </h1>
+      <p style={{ fontSize:17, color:"rgba(255,255,255,0.75)", maxWidth:500, margin:"0 auto 40px", lineHeight:1.7 }}>
+        اعثر على أفضل الأساتذة في ولايتك — لجميع المستويات من الابتدائي حتى الجامعي
+      </p>
+
+      {/* Search box */}
+      <div style={{
+        background:"#fff", borderRadius:16, padding:16, maxWidth:640, margin:"0 auto",
+        display:"grid", gridTemplateColumns:"1fr 1fr auto", gap:12,
+        boxShadow:"0 20px 60px rgba(0,0,0,0.25)",
+      }}>
+        <input value={query} onChange={e=>setQuery(e.target.value)}
+          placeholder="المادة (رياضيات، فرنسية...)"
+          style={{ border:`1px solid ${C.border}`, borderRadius:10, padding:"11px 14px", fontSize:13, outline:"none", fontFamily:"inherit", direction:"rtl", color:C.text }}
+        />
+        <select value={wilaya} onChange={e=>setWilaya(e.target.value)}
+          style={{ border:`1px solid ${C.border}`, borderRadius:10, padding:"11px 14px", fontSize:13, outline:"none", fontFamily:"inherit", direction:"rtl", color:wilaya?C.text:C.muted, background:"#fff" }}>
+          <option value="">اختر الولاية</option>
+          {WILAYAS.map(w=><option key={w} value={w}>{w}</option>)}
+        </select>
+        <Btn onClick={()=>setPage("search")}>🔍 ابحث</Btn>
+      </div>
+
+      {/* Quick tags */}
+      <div style={{ display:"flex", gap:10, justifyContent:"center", marginTop:24, flexWrap:"wrap" }}>
+        {["الرياضيات","الفيزياء","الفرنسية","العربية","BAC"].map(s=>(
+          <button key={s} onClick={()=>setPage("search")} style={{
+            background:"rgba(255,255,255,0.15)", backdropFilter:"blur(8px)",
+            border:"1px solid rgba(255,255,255,0.2)", borderRadius:20, padding:"6px 16px",
+            color:"rgba(255,255,255,0.9)", fontSize:12, cursor:"pointer", fontFamily:"inherit",
+            transition:"all 0.15s",
+          }}
+            onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.25)"}
+            onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.15)"}
+          >{s}</button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function StatsBar() {
+  return (
+    <div style={{ background:C.white, borderBottom:`1px solid ${C.border}`, padding:"28px 32px", direction:"rtl" }}>
+      <div style={{ maxWidth:900, margin:"0 auto", display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:24 }}>
+        {STATS.map((s,i)=>(
+          <div key={i} style={{ textAlign:"center" }}>
+            <div style={{ fontSize:28 }}>{s.icon}</div>
+            <div style={{ fontSize:26, fontWeight:900, color:C.primary, letterSpacing:"-0.02em" }}>{s.n}</div>
+            <div style={{ fontSize:12, color:C.muted, marginTop:2 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TeacherCard({ t, onClick }) {
+  return (
+    <div onClick={onClick} style={{
+      background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:22,
+      cursor:"pointer", transition:"all 0.2s", direction:"rtl",
+    }}
+      onMouseEnter={e=>{ e.currentTarget.style.boxShadow=`0 8px 32px ${C.primary}18`; e.currentTarget.style.borderColor=C.primary; e.currentTarget.style.transform="translateY(-3px)"; }}
+      onMouseLeave={e=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.borderColor=C.border; e.currentTarget.style.transform="translateY(0)"; }}
+    >
+      {/* Header */}
+      <div style={{ display:"flex", gap:14, alignItems:"flex-start", marginBottom:14 }}>
+        <div style={{ position:"relative" }}>
+          <Avatar letter={t.avatar} size={52} />
+          {t.online && <span style={{ position:"absolute", bottom:2, right:2, width:11, height:11, background:"#22c55e", borderRadius:"50%", border:"2px solid #fff" }}/>}
+        </div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:4 }}>
+            <span style={{ fontSize:14, fontWeight:800, color:C.text }}>{t.name}</span>
+            {t.badge && <Tag color={t.badge==="مميّز"?C.accent:C.primary} bg={t.badge==="مميّز"?C.accentLight:C.primaryLight}>{t.badge==="مميّز"?"⭐ مميّز":"✨ جديد"}</Tag>}
+          </div>
+          <div style={{ fontSize:12, color:C.primary, fontWeight:600, marginBottom:2 }}>{t.subject}</div>
+          <div style={{ fontSize:11, color:C.muted }}>📍 {t.wilaya} · {t.level}</div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div style={{ display:"flex", gap:16, marginBottom:16 }}>
+        <div style={{ textAlign:"center" }}>
+          <div style={{ fontSize:15, fontWeight:800, color:C.accent }}>⭐ {t.rating}</div>
+          <div style={{ fontSize:10, color:C.muted }}>{t.reviews} تقييم</div>
+        </div>
+        <div style={{ width:1, background:C.border }}/>
+        <div style={{ textAlign:"center" }}>
+          <div style={{ fontSize:15, fontWeight:800, color:C.text }}>{t.exp} سنوات</div>
+          <div style={{ fontSize:10, color:C.muted }}>خبرة</div>
+        </div>
+        <div style={{ width:1, background:C.border }}/>
+        <div style={{ textAlign:"center" }}>
+          <div style={{ fontSize:15, fontWeight:800, color:C.primary }}>{t.price.toLocaleString()} دج</div>
+          <div style={{ fontSize:10, color:C.muted }}>/ الشهر</div>
+        </div>
+      </div>
+
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <span style={{ fontSize:11, color:t.online?`#22c55e`:C.muted, fontWeight:600 }}>
+          {t.online?"🟢 متاح الآن":"⚫ غير متاح"}
+        </span>
+        <Btn small>حجز حصة</Btn>
+      </div>
+    </div>
+  );
+}
+
+function SearchPage({ setPage, setSelectedTeacher }) {
+  const [subject, setSubject] = useState("");
+  const [wilaya, setWilaya] = useState("");
+  const [level, setLevel] = useState("");
+  const [maxPrice, setMaxPrice] = useState(5000);
+  const [onlineOnly, setOnlineOnly] = useState(false);
+  const [sort, setSort] = useState("rating");
+
+  const filtered = TEACHERS
+    .filter(t =>
+      (!subject || t.subject.includes(subject)) &&
+      (!wilaya || t.wilaya === wilaya) &&
+      (!level || t.level.includes(level.split(" ")[0])) &&
+      t.price <= maxPrice &&
+      (!onlineOnly || t.online)
+    )
+    .sort((a,b) => sort==="rating" ? b.rating-a.rating : sort==="price" ? a.price-b.price : b.reviews-a.reviews);
+
+  return (
+    <div style={{ minHeight:"100vh", background:C.bg, direction:"rtl" }}>
+      {/* Filter bar */}
+      <div style={{ background:C.white, borderBottom:`1px solid ${C.border}`, padding:"20px 32px" }}>
+        <div style={{ maxWidth:1100, margin:"0 auto" }}>
+          <h2 style={{ margin:"0 0 16px", fontSize:18, fontWeight:800, color:C.text }}>البحث عن أستاذ خصوصي</h2>
+          <div style={{ display:"flex", gap:12, flexWrap:"wrap", alignItems:"center" }}>
+            <select value={subject} onChange={e=>setSubject(e.target.value)} style={selStyle}>
+              <option value="">كل المواد</option>
+              {SUBJECTS.map(s=><option key={s}>{s}</option>)}
+            </select>
+            <select value={wilaya} onChange={e=>setWilaya(e.target.value)} style={selStyle}>
+              <option value="">كل الولايات</option>
+              {WILAYAS.map(w=><option key={w}>{w}</option>)}
+            </select>
+            <select value={level} onChange={e=>setLevel(e.target.value)} style={selStyle}>
+              <option value="">كل المستويات</option>
+              {LEVELS.map(l=><option key={l}>{l}</option>)}
+            </select>
+            <select value={sort} onChange={e=>setSort(e.target.value)} style={selStyle}>
+              <option value="rating">الأعلى تقييماً</option>
+              <option value="price">الأقل سعراً</option>
+              <option value="reviews">الأكثر تقييماً</option>
+            </select>
+            <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:13, color:C.muted, cursor:"pointer", whiteSpace:"nowrap" }}>
+              <input type="checkbox" checked={onlineOnly} onChange={e=>setOnlineOnly(e.target.checked)} />
+              متاح الآن فقط
+            </label>
+            <span style={{ marginRight:"auto", fontSize:13, color:C.muted }}>{filtered.length} نتيجة</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Results */}
+      <div style={{ maxWidth:1100, margin:"0 auto", padding:"28px 32px" }}>
+        {filtered.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"80px 0", color:C.muted }}>
+            <div style={{ fontSize:48, marginBottom:16 }}>🔍</div>
+            <div style={{ fontSize:16, fontWeight:700 }}>لا توجد نتائج</div>
+            <div style={{ fontSize:13, marginTop:8 }}>جرّب تغيير معايير البحث</div>
+          </div>
+        ) : (
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(300px,1fr))", gap:20 }}>
+            {filtered.map(t=>(
+              <TeacherCard key={t.id} t={t} onClick={()=>{ setSelectedTeacher(t); setPage("teacher"); }} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const selStyle = {
+  border:`1px solid ${C.border}`, borderRadius:10, padding:"9px 14px",
+  fontSize:13, outline:"none", fontFamily:"inherit", direction:"rtl",
+  color:C.text, background:C.white, cursor:"pointer",
+};
+
+function TeacherProfile({ teacher, setPage }) {
+  const [booked, setBooked] = useState(false);
+  const [tab, setTab] = useState("about");
+  if (!teacher) return null;
+  const s = statusStyle => statusStyle;
+  return (
+    <div style={{ minHeight:"100vh", background:C.bg, direction:"rtl" }}>
+      {/* Hero */}
+      <div style={{ background:`linear-gradient(135deg, ${C.primaryDark}, ${C.primary})`, padding:"40px 32px 60px" }}>
+        <div style={{ maxWidth:800, margin:"0 auto" }}>
+          <button onClick={()=>setPage("search")} style={{ background:"rgba(255,255,255,0.15)", border:"none", borderRadius:8, padding:"7px 14px", color:"#fff", fontSize:12, cursor:"pointer", fontFamily:"inherit", marginBottom:24 }}>← رجوع</button>
+          <div style={{ display:"flex", gap:24, alignItems:"center", flexWrap:"wrap" }}>
+            <Avatar letter={teacher.avatar} size={80} color="#fff" />
+            <div style={{ flex:1 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8, flexWrap:"wrap" }}>
+                <h1 style={{ margin:0, fontSize:24, fontWeight:900, color:"#fff" }}>{teacher.name}</h1>
+                {teacher.badge && <Tag color={C.accent} bg="rgba(232,160,32,0.2)">{teacher.badge==="مميّز"?"⭐ مميّز":"✨ جديد"}</Tag>}
+              </div>
+              <div style={{ fontSize:14, color:"rgba(255,255,255,0.8)", marginBottom:6 }}>{teacher.subject} · {teacher.level}</div>
+              <div style={{ fontSize:13, color:"rgba(255,255,255,0.65)" }}>📍 {teacher.wilaya}</div>
+            </div>
+            <div style={{ background:"rgba(255,255,255,0.12)", backdropFilter:"blur(8px)", borderRadius:14, padding:"18px 24px", textAlign:"center" }}>
+              <div style={{ fontSize:28, fontWeight:900, color:C.accent }}>{teacher.price.toLocaleString()}</div>
+              <div style={{ fontSize:12, color:"rgba(255,255,255,0.7)" }}>دج / الشهر</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth:800, margin:"-30px auto 0", padding:"0 32px 40px", position:"relative" }}>
+        {/* Stats card */}
+        <div style={{ background:C.white, borderRadius:16, padding:"20px 24px", border:`1px solid ${C.border}`, marginBottom:24, display:"flex", gap:32, flexWrap:"wrap", boxShadow:"0 4px 24px rgba(0,0,0,0.08)" }}>
+          {[
+            { v:`⭐ ${teacher.rating}`, l:"التقييم" },
+            { v:teacher.reviews, l:"تقييم" },
+            { v:`${teacher.exp} سنوات`, l:"خبرة" },
+            { v:teacher.online?"🟢 الآن":"⚫ لاحقاً", l:"التوفر" },
+          ].map((s,i)=>(
+            <div key={i} style={{ textAlign:"center", flex:1 }}>
+              <div style={{ fontSize:20, fontWeight:800, color:C.primary }}>{s.v}</div>
+              <div style={{ fontSize:11, color:C.muted, marginTop:2 }}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display:"flex", gap:4, background:C.subtle, borderRadius:10, padding:4, marginBottom:24 }}>
+          {[["about","عن الأستاذ"],["reviews","التقييمات"],["schedule","المواعيد"]].map(([id,label])=>(
+            <button key={id} onClick={()=>setTab(id)} style={{
+              flex:1, padding:"9px", border:"none", borderRadius:8, cursor:"pointer", fontFamily:"inherit",
+              background:tab===id?C.white:"transparent", color:tab===id?C.primary:C.muted,
+              fontWeight:tab===id?700:400, fontSize:13, transition:"all 0.15s",
+              boxShadow:tab===id?"0 2px 8px rgba(0,0,0,0.08)":"none",
+            }}>{label}</button>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        {tab==="about" && (
+          <div style={{ background:C.white, borderRadius:14, padding:24, border:`1px solid ${C.border}`, marginBottom:20 }}>
+            <h3 style={{ margin:"0 0 12px", color:C.text }}>نبذة عن الأستاذ</h3>
+            <p style={{ margin:"0 0 16px", color:C.muted, lineHeight:1.8, fontSize:14 }}>
+              أستاذ متخصص في {teacher.subject} مع خبرة {teacher.exp} سنوات في التدريس الخصوصي. حاصل على شهادة في العلوم من جامعة الجزائر. ساعدت أكثر من 200 طالب على تحسين نتائجهم وتجاوز امتحان البكالوريا بتفوق.
+            </p>
+            <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+              {["تدريس تفاعلي","تمارين مخصصة","متابعة مستمرة","إعداد BAC"].map(f=>(
+                <Tag key={f}>✓ {f}</Tag>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab==="reviews" && (
+          <div style={{ display:"flex", flexDirection:"column", gap:14, marginBottom:20 }}>
+            {[
+              { name:"أحمد ب.", rating:5, text:"أستاذ ممتاز! ابني تحسّن كثيراً في الرياضيات خلال شهرين فقط", date:"منذ أسبوع" },
+              { name:"فاطمة ك.", rating:5, text:"طريقة الشرح واضحة جداً والأستاذ صبور مع الطلاب", date:"منذ شهر" },
+              { name:"يوسف م.", rating:4, text:"جيد جداً، انتقلت من 8 إلى 16 في الفيزياء!", date:"منذ شهرين" },
+            ].map((r,i)=>(
+              <div key={i} style={{ background:C.white, borderRadius:12, padding:18, border:`1px solid ${C.border}` }}>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <Avatar letter={r.name[0]} size={34} />
+                    <span style={{ fontSize:13, fontWeight:700, color:C.text }}>{r.name}</span>
+                  </div>
+                  <div>
+                    {"⭐".repeat(r.rating)}
+                    <span style={{ fontSize:11, color:C.muted, marginRight:6 }}>{r.date}</span>
+                  </div>
+                </div>
+                <p style={{ margin:0, fontSize:13, color:C.muted, lineHeight:1.7 }}>{r.text}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab==="schedule" && (
+          <div style={{ background:C.white, borderRadius:14, padding:24, border:`1px solid ${C.border}`, marginBottom:20 }}>
+            <h3 style={{ margin:"0 0 16px", color:C.text }}>المواعيد المتاحة هذا الأسبوع</h3>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
+              {["السبت 10:00","السبت 16:00","الأحد 09:00","الثلاثاء 17:00","الأربعاء 11:00","الجمعة 14:00"].map((slot,i)=>(
+                <button key={i} style={{
+                  padding:"10px", border:`1px solid ${C.border}`, borderRadius:10,
+                  background:i===1?C.primaryLight:C.white, color:i===1?C.primary:C.text,
+                  fontSize:12, cursor:"pointer", fontFamily:"inherit", fontWeight:600,
+                  transition:"all 0.15s",
+                }}
+                  onMouseEnter={e=>{ e.currentTarget.style.background=C.primaryLight; e.currentTarget.style.color=C.primary; e.currentTarget.style.borderColor=C.primary; }}
+                  onMouseLeave={e=>{ if(i!==1){ e.currentTarget.style.background=C.white; e.currentTarget.style.color=C.text; e.currentTarget.style.borderColor=C.border; } }}
+                >{slot}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Book CTA */}
+        {!booked ? (
+          <div style={{ background:C.white, borderRadius:14, padding:24, border:`1px solid ${C.border}`, textAlign:"center" }}>
+            <div style={{ fontSize:14, color:C.muted, marginBottom:16 }}>احجز حصتك التجريبية المجانية الأولى!</div>
+            <Btn onClick={()=>setBooked(true)} style={{ width:"100%", justifyContent:"center" }}>📅 احجز حصة مجانية</Btn>
+          </div>
+        ) : (
+          <div style={{ background:C.primaryLight, borderRadius:14, padding:24, border:`1px solid ${C.primary}44`, textAlign:"center" }}>
+            <div style={{ fontSize:32, marginBottom:8 }}>✅</div>
+            <div style={{ fontSize:16, fontWeight:800, color:C.primary, marginBottom:4 }}>تم إرسال طلب الحجز!</div>
+            <div style={{ fontSize:13, color:C.muted }}>سيتواصل معك {teacher.name} خلال 24 ساعة</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HowItWorks() {
+  const steps = [
+    { n:"01", icon:"🔍", title:"ابحث عن أستاذك", desc:"أدخل المادة والولاية وابحث بين آلاف الأساتذة المعتمدين في كل أنحاء الجزائر" },
+    { n:"02", icon:"👀", title:"قارن وتحقق", desc:"اطلع على ملفات الأساتذة، تقييمات الطلاب، الخبرة، والأسعار قبل القرار" },
+    { n:"03", icon:"📅", title:"احجز مجاناً", desc:"احجز حصتك التجريبية الأولى مجاناً — بدون أي التزام مسبق" },
+    { n:"04", icon:"🎓", title:"تعلّم وتقدّم", desc:"استمتع بدروس خصوصية عالية الجودة وحقق نتائجك المطلوبة" },
+  ];
+  return (
+    <section style={{ padding:"80px 32px", background:C.white, direction:"rtl" }}>
+      <div style={{ maxWidth:900, margin:"0 auto" }}>
+        <div style={{ textAlign:"center", marginBottom:56 }}>
+          <Tag>كيف تعمل المنصة</Tag>
+          <h2 style={{ fontSize:"clamp(24px,4vw,38px)", fontWeight:900, color:C.text, margin:"16px 0 0", letterSpacing:"-0.02em" }}>أربع خطوات بسيطة<br/><span style={{ color:C.primary }}>لتبدأ رحلتك التعليمية</span></h2>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:28 }}>
+          {steps.map((s,i)=>(
+            <div key={i} style={{ textAlign:"center", padding:"28px 20px", borderRadius:16, border:`1px solid ${C.border}`, background:C.bg, position:"relative", transition:"all 0.2s" }}
+              onMouseEnter={e=>{ e.currentTarget.style.boxShadow=`0 8px 32px ${C.primary}18`; e.currentTarget.style.borderColor=C.primary; }}
+              onMouseLeave={e=>{ e.currentTarget.style.boxShadow="none"; e.currentTarget.style.borderColor=C.border; }}
+            >
+              <div style={{ position:"absolute", top:-14, right:"50%", transform:"translateX(50%)", background:C.grad, color:"#fff", width:28, height:28, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:800 }}>{s.n}</div>
+              <div style={{ fontSize:40, marginBottom:14 }}>{s.icon}</div>
+              <h3 style={{ margin:"0 0 10px", fontSize:16, fontWeight:800, color:C.text }}>{s.title}</h3>
+              <p style={{ margin:0, fontSize:13, color:C.muted, lineHeight:1.7 }}>{s.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AuthPage({ type, setPage, setUser }) {
+  const isLogin = type==="login";
+  const [name, setName]     = useState("");
+  const [email, setEmail]   = useState("");
+  const [pass, setPass]     = useState("");
+  const [role, setRole]     = useState("student");
+  const [wilaya, setWilaya] = useState("");
+  const [err, setErr]       = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    if (!email || !pass) { setErr("الرجاء ملء جميع الحقول"); return; }
+    if (!isLogin && !name) { setErr("الرجاء إدخال الاسم"); return; }
+    setLoading(true); setErr("");
+    await new Promise(r=>setTimeout(r,700));
+    setUser({ name: isLogin?"مرحباً بك":name, email, role, wilaya });
+    setPage("home");
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ minHeight:"100vh", background:C.bg, display:"flex", alignItems:"center", justifyContent:"center", padding:24, direction:"rtl" }}>
+      <div style={{ width:"100%", maxWidth:420 }}>
+        {/* Logo */}
+        <div style={{ textAlign:"center", marginBottom:36 }}>
+          <div style={{ width:56, height:56, background:C.grad, borderRadius:16, display:"inline-flex", alignItems:"center", justifyContent:"center", fontSize:26, marginBottom:14, boxShadow:`0 8px 24px ${C.primary}44` }}>📚</div>
+          <h1 style={{ margin:"0 0 4px", fontSize:22, fontWeight:900, color:C.primary }}>دَرْسنا</h1>
+          <p style={{ margin:0, fontSize:13, color:C.muted }}>{isLogin?"مرحباً بعودتك!":"انضم إلى أكبر منصة تعليمية في الجزائر"}</p>
+        </div>
+
+        <div style={{ background:C.white, borderRadius:16, padding:32, border:`1px solid ${C.border}`, boxShadow:"0 4px 24px rgba(0,0,0,0.06)" }}>
+          {!isLogin && (
+            <>
+              {/* Role selector */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:20 }}>
+                {[["student","🎓 أنا طالب"],["teacher","👨‍🏫 أنا أستاذ"]].map(([r,l])=>(
+                  <button key={r} onClick={()=>setRole(r)} style={{
+                    padding:"12px", border:`2px solid ${role===r?C.primary:C.border}`,
+                    borderRadius:10, background:role===r?C.primaryLight:C.white,
+                    color:role===r?C.primary:C.muted, fontSize:13, fontWeight:700,
+                    cursor:"pointer", fontFamily:"inherit", transition:"all 0.15s",
+                  }}>{l}</button>
+                ))}
+              </div>
+
+              <div style={{ marginBottom:14 }}>
+                <label style={{ fontSize:11, color:C.muted, letterSpacing:"0.1em", display:"block", marginBottom:6 }}>الاسم الكامل</label>
+                <input value={name} onChange={e=>setName(e.target.value)} placeholder="مثال: محمد أمين" style={inputStyle} />
+              </div>
+            </>
+          )}
+
+          <div style={{ marginBottom:14 }}>
+            <label style={{ fontSize:11, color:C.muted, letterSpacing:"0.1em", display:"block", marginBottom:6 }}>البريد الإلكتروني</label>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="example@gmail.com" style={inputStyle} />
+          </div>
+
+          <div style={{ marginBottom: isLogin?20:14 }}>
+            <label style={{ fontSize:11, color:C.muted, letterSpacing:"0.1em", display:"block", marginBottom:6 }}>كلمة المرور</label>
+            <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="6 أحرف على الأقل" style={inputStyle} onKeyDown={e=>e.key==="Enter"&&submit()} />
+          </div>
+
+          {!isLogin && (
+            <div style={{ marginBottom:20 }}>
+              <label style={{ fontSize:11, color:C.muted, letterSpacing:"0.1em", display:"block", marginBottom:6 }}>الولاية</label>
+              <select value={wilaya} onChange={e=>setWilaya(e.target.value)} style={{ ...inputStyle, cursor:"pointer" }}>
+                <option value="">اختر ولايتك</option>
+                {WILAYAS.map(w=><option key={w}>{w}</option>)}
+              </select>
+            </div>
+          )}
+
+          {err && <div style={{ background:"#fef2f2", border:"1px solid #fca5a5", borderRadius:8, padding:"10px 14px", color:C.red, fontSize:12, marginBottom:14 }}>⚠ {err}</div>}
+
+          <button onClick={submit} disabled={loading} style={{
+            width:"100%", padding:"13px", background:C.grad, border:"none",
+            borderRadius:10, color:"#fff", fontSize:14, fontWeight:700,
+            cursor:loading?"not-allowed":"pointer", fontFamily:"inherit",
+            opacity:loading?0.7:1, boxShadow:`0 4px 20px ${C.primary}44`,
+          }}>
+            {loading ? "⏳ جاري..." : isLogin ? "تسجيل الدخول ←" : "إنشاء حساب مجاني ←"}
+          </button>
+
+          <div style={{ textAlign:"center", marginTop:16, fontSize:13, color:C.muted }}>
+            {isLogin ? "ليس لديك حساب؟ " : "لديك حساب بالفعل؟ "}
+            <button onClick={()=>setPage(isLogin?"register":"login")} style={{ background:"none", border:"none", color:C.primary, fontWeight:700, cursor:"pointer", fontFamily:"inherit", fontSize:13 }}>
+              {isLogin?"إنشاء حساب مجاني":"تسجيل الدخول"}
+            </button>
+          </div>
+        </div>
+
+        {!isLogin && (
+          <p style={{ textAlign:"center", fontSize:11, color:C.muted, marginTop:16 }}>
+            🎓 الأساتذة يحصلون على <strong style={{color:C.primary}}>أول شهر مجاناً</strong> بدون عمولة
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const inputStyle = {
+  width:"100%", border:`1px solid ${C.border}`, borderRadius:10,
+  padding:"11px 14px", fontSize:13, outline:"none", fontFamily:"inherit",
+  direction:"rtl", color:C.text, background:C.white, boxSizing:"border-box",
+  transition:"border 0.2s",
+};
+
+function FeaturedTeachers({ setPage, setSelectedTeacher }) {
+  return (
+    <section style={{ padding:"72px 32px", background:C.bg, direction:"rtl" }}>
+      <div style={{ maxWidth:1100, margin:"0 auto" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:36, flexWrap:"wrap", gap:16 }}>
+          <div>
+            <Tag>أساتذة مميّزون</Tag>
+            <h2 style={{ fontSize:"clamp(22px,3vw,34px)", fontWeight:900, color:C.text, margin:"12px 0 0", letterSpacing:"-0.02em" }}>الأعلى تقييماً <span style={{ color:C.primary }}>هذا الأسبوع</span></h2>
+          </div>
+          <Btn variant="outline" onClick={()=>setPage("search")}>عرض الكل ←</Btn>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))", gap:20 }}>
+          {TEACHERS.filter(t=>t.badge==="مميّز").map(t=>(
+            <TeacherCard key={t.id} t={t} onClick={()=>{ setSelectedTeacher(t); setPage("teacher"); }} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  return (
+    <footer style={{ background:C.primaryDark, color:"rgba(255,255,255,0.7)", padding:"48px 32px 24px", direction:"rtl" }}>
+      <div style={{ maxWidth:1000, margin:"0 auto" }}>
+        <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr", gap:40, marginBottom:40, flexWrap:"wrap" }}>
+          <div>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+              <div style={{ width:34, height:34, background:C.grad, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>📚</div>
+              <span style={{ fontSize:18, fontWeight:900, color:"#fff" }}>دَرْسنا</span>
+            </div>
+            <p style={{ margin:"0 0 16px", fontSize:13, lineHeight:1.7 }}>أكبر منصة للتعليم الخصوصي في الجزائر. نربط الطلاب بأفضل الأساتذة في 48 ولاية.</p>
+            <div style={{ display:"flex", gap:10 }}>
+              {["📘","📷","🐦"].map((i,idx)=>(
+                <div key={idx} style={{ width:34, height:34, background:"rgba(255,255,255,0.1)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:16 }}>{i}</div>
+              ))}
+            </div>
+          </div>
+          {[
+            { title:"المنصة", links:["البحث عن أستاذ","كيف تعمل","الأسعار","المواد"] },
+            { title:"للأساتذة", links:["سجّل كأستاذ","لوحة التحكم","الدعم","الشروط"] },
+            { title:"تواصل معنا", links:["info@darsna.dz","0550 123 456","الجزائر العاصمة","واتساب"] },
+          ].map((col,i)=>(
+            <div key={i}>
+              <div style={{ fontSize:13, fontWeight:800, color:"#fff", marginBottom:14 }}>{col.title}</div>
+              {col.links.map(l=>(
+                <div key={l} style={{ fontSize:12, marginBottom:8, cursor:"pointer", transition:"color 0.15s" }}
+                  onMouseEnter={e=>e.currentTarget.style.color="#fff"}
+                  onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.7)"}
+                >{l}</div>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div style={{ borderTop:"1px solid rgba(255,255,255,0.1)", paddingTop:20, display:"flex", justifyContent:"space-between", fontSize:11, flexWrap:"wrap", gap:10 }}>
+          <span>© 2025 دَرْسنا DARSNA.DZ — جميع الحقوق محفوظة 🇩🇿</span>
+          <span>صُنع بـ ❤️ في الجزائر</span>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+// ── MAIN APP ───────────────────────────────────────────────────────────────
+export default function App() {
+  const [page, setPage] = useState("home");
+  const [user, setUser] = useState(null);
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
+
+  const showNav = !["login","register"].includes(page);
+
+  return (
+    <div style={{ minHeight:"100vh", background:C.bg, fontFamily:"'Cairo', 'Tajawal', 'DM Sans', sans-serif" }}>
+      {showNav && <Navbar page={page} setPage={setPage} user={user} setUser={setUser} />}
+
+      {page==="home" && (
+        <>
+          <HeroSection setPage={setPage} />
+          <StatsBar />
+          <FeaturedTeachers setPage={setPage} setSelectedTeacher={setSelectedTeacher} />
+          <HowItWorks />
+          {/* CTA */}
+          <section style={{ background:C.grad, padding:"72px 32px", textAlign:"center", direction:"rtl" }}>
+            <h2 style={{ fontSize:"clamp(22px,4vw,38px)", fontWeight:900, color:"#fff", margin:"0 0 16px", letterSpacing:"-0.02em" }}>
+              أنت أستاذ؟ انضم إلينا مجاناً!
+            </h2>
+            <p style={{ fontSize:15, color:"rgba(255,255,255,0.8)", margin:"0 0 32px", maxWidth:500, marginLeft:"auto", marginRight:"auto" }}>
+              أكثر من 28,000 طالب ينتظرون أستاذاً مثلك. ابدأ بدون عمولة الشهر الأول.
+            </p>
+            <Btn variant="gold" onClick={()=>setPage("register")}>🎓 سجّل كأستاذ مجاناً</Btn>
+          </section>
+          <Footer />
+        </>
+      )}
+
+      {page==="search" && <SearchPage setPage={setPage} setSelectedTeacher={setSelectedTeacher} />}
+      {page==="teacher" && <TeacherProfile teacher={selectedTeacher} setPage={setPage} />}
+      {page==="how" && <><HowItWorks /><Footer /></>}
+      {page==="login" && <AuthPage type="login" setPage={setPage} setUser={setUser} />}
+      {page==="register" && <AuthPage type="register" setPage={setPage} setUser={setUser} />}
+    </div>
+  );
+}
